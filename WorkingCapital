@@ -1,0 +1,366 @@
+SELECT DISTINCT
+		 
+			case
+				 when lmd.txnDate1  is not null
+				 AND	tr.actPaymentDate  is not null then 'Payment realised and paid to seller'
+				 when lmd.txnDate1  is not null
+				 AND	tr.actPaymentDate  is null then 'Payment realised and with bijnis'
+				 when lmd.txnDate1  is null
+				 AND	tr.actPaymentDate  is not null then 'Paid to Seller, not yet realised by bijnis'
+			 end as Disposition,
+		 'COD' as Payment_Status,
+		 lmd.txnDate1 as PaymentReceiveddate,
+		 from_unixtime(tr.actPaymentDate + 19800) as SellerPaymentDate,
+		 
+			case
+				 when upper(o.paymentoption)  in ( 'FULL COD'  , '20% ADVANCE | 80% COD'  , '10% ADVANCE | 90% COD'  , 'RS.10000 ADVANCE'  , 'RS.40000 ADVANCE'  ) then 
+					case
+						 when upper(os.orderstatus)  = 'DELIVERED' then ifnull(lmd.txnDate1, dateadd(day, 5, from_unixtime(cmt.actdeliverydate + 19800)))
+						 when upper(os.orderstatus)  = 'RTO' then ifnull(lmd.txnDate1, dateadd(day, 20, from_unixtime(cmt.rtodate + 19800)))
+						 when upper(os.orderstatus)  not in ( 'DELIVERED'  , 'RTO'  )
+						 AND	cmt.actdispatchdate  > 0 then ifnull(lmd.txnDate1, dateadd(day, 12, from_unixtime(cmt.actdispatchdate + 19800)))
+						 when upper(os.orderstatus)  not in ( 'DELIVERED'  , 'RTO'  )
+						 AND	(cmt.actdispatchdate  is null
+						 OR	cmt.actdispatchdate  = 0) then ifnull(lmd.txnDate1, dateadd(day, 15, from_unixtime(o.updatedOn + 19800)))
+					 end
+			 end calculatedReceivedDate,
+		 ifnull(from_unixtime(tr.actPaymentDate + 19800), if_null(from_unixtime(pc.expectedpaymentdate + 19800), cast(DATE_ADD(date_format(pomr.createdOn, '%Y-%m-%d'), interval (CAST(REPLACE(REPLACE(REPLACE(REPLACE(SUBSTRING_INDEX(popm.PolicyId1, ',', -1), '"', ''), ':', ''), '}', ''), 'value', '') AS SIGNED)) DAY) as date))) as calculatedPaymentDate,
+		 lm.skorderid Skorderid,
+		 from_unixtime(o.updatedOn + 19800) as OrderPlacedDate,
+		 os.orderstatus orderstatus,
+		 lm.sellerid sellerid,
+		 upper(ag.companyname) sellername,
+		 lm.id as Lotid,
+		 upper(cm.name) subcategory,
+		 upper(cm2.name) supercategory,
+		 upper(sm.companyname) Cluster,
+		 Upper(case
+				 when a.Matchmaker  = 'Ashish Bothra' then 'Heena Manchanda'
+				 when a.Matchmaker  = 'Md Sameer' then 'Aanam Aquil'
+				 else a.Matchmaker
+			 end) as Matchmaker,
+		 o.paymentoption PaymentOption,
+		 
+			case
+				 when upper(o.paymentoption)  in ( 'FULL COD'  , '20% ADVANCE | 80% COD'  , '10% ADVANCE | 90% COD'  , 'RS.10000 ADVANCE'  , 'RS.40000 ADVANCE'  ) then 
+					case
+						 when upper(os.orderstatus)  = 'DELIVERED' then datediff(day, ifnull(from_unixtime(tr.actPaymentDate + 19800), if_null(from_unixtime(pc.expectedpaymentdate + 19800), cast(DATE_ADD(date_format(pomr.createdOn, '%Y-%m-%d'), interval (CAST(REPLACE(REPLACE(REPLACE(REPLACE(SUBSTRING_INDEX(popm.PolicyId1, ',', -1), '"', ''), ':', ''), '}', ''), 'value', '') AS SIGNED)) DAY) as date))), ifnull(lmd.txnDate1, dateadd(day, 5, from_unixtime(cmt.actdeliverydate + 19800))))
+						 when upper(os.orderstatus)  = 'RTO' then datediff(day, ifnull(from_unixtime(tr.actPaymentDate + 19800), if_null(from_unixtime(pc.expectedpaymentdate + 19800), cast(DATE_ADD(date_format(pomr.createdOn, '%Y-%m-%d'), interval (CAST(REPLACE(REPLACE(REPLACE(REPLACE(SUBSTRING_INDEX(popm.PolicyId1, ',', -1), '"', ''), ':', ''), '}', ''), 'value', '') AS SIGNED)) DAY) as date))), ifnull(lmd.txnDate1, dateadd(day, 20, cmt.RTODate1)))
+						 when upper(os.orderstatus)  not in ( 'DELIVERED'  , 'RTO'  )
+						 AND	cmt.actdispatchdate  > 0 then datediff(day, ifnull(from_unixtime(tr.actPaymentDate + 19800), if_null(from_unixtime(pc.expectedpaymentdate + 19800), cast(DATE_ADD(date_format(pomr.createdOn, '%Y-%m-%d'), interval (CAST(REPLACE(REPLACE(REPLACE(REPLACE(SUBSTRING_INDEX(popm.PolicyId1, ',', -1), '"', ''), ':', ''), '}', ''), 'value', '') AS SIGNED)) DAY) as date))), ifnull(lmd.txnDate1, dateadd(day, 12, from_unixtime(cmt.actdispatchdate + 19800))))
+						 when upper(os.orderstatus)  not in ( 'DELIVERED'  , 'RTO'  )
+						 AND	(cmt.actdispatchdate  is null
+						 OR	cmt.actdispatchdate  = 0) then datediff(day, ifnull(from_unixtime(tr.actPaymentDate + 19800), if_null(from_unixtime(pc.expectedpaymentdate + 19800), cast(DATE_ADD(date_format(pomr.createdOn, '%Y-%m-%d'), interval (CAST(REPLACE(REPLACE(REPLACE(REPLACE(SUBSTRING_INDEX(popm.PolicyId1, ',', -1), '"', ''), ':', ''), '}', ''), 'value', '') AS SIGNED)) DAY) as date))), ifnull(lmd.txnDate1, dateadd(day, 15, from_unixtime(o.updatedOn + 19800))))
+					 end
+			 end as workingcapitalindays,
+		 
+			case
+				 when upper(o.paymentoption)  in ( '20% ADVANCE | 80% COD'  ) then 0.8 * (pold.price / 100)
+				 when upper(o.paymentoption)  in ( '10% ADVANCE | 90% COD'  ) then 0.9 * (pold.price / 100)
+				 when upper(o.paymentoption)  in ( 'FULL COD'  ) then (pold.price / 100)
+				 when upper(o.paymentoption)  in ( 'RS.10000 ADVANCE'  ) then (1 -rt.ordervalue) * (pold.price / 100)
+				 when upper(o.paymentoption)  in ( 'RS.40000 ADVANCE'  ) then (1 -rt.ordervalue1) * (pold.price / 100)
+			 end as Price,
+		 
+			case
+				 when upper(o.paymentoption)  in ( '20% ADVANCE | 80% COD'  ) then 0.8 * ost.value
+				 when upper(o.paymentoption)  in ( '10% ADVANCE | 90% COD'  ) then 0.9 * ost.value
+				 when upper(o.paymentoption)  in ( 'FULL COD'  ) then ost.value
+				 when upper(o.paymentoption)  in ( 'RS.10000 ADVANCE'  ) then (1 -rt.ordervalue) * ost.value
+				 when upper(o.paymentoption)  in ( 'RS.40000 ADVANCE'  ) then (1 -rt.ordervalue1) * ost.value
+			 end as OrderValue,
+		 
+			case
+				 when upper(o.paymentoption)  in ( '20% ADVANCE | 80% COD'  ) then ((0.8 * (pold.price / 100)) * datediff(day, ifnull(from_unixtime(tr.actPaymentDate + 19800), if_null(from_unixtime(pc.expectedpaymentdate + 19800), cast(DATE_ADD(date_format(pomr.createdOn, '%Y-%m-%d'), interval (CAST(REPLACE(REPLACE(REPLACE(REPLACE(SUBSTRING_INDEX(popm.PolicyId1, ',', -1), '"', ''), ':', ''), '}', ''), 'value', '') AS SIGNED)) DAY) as date))), ifnull(lmd.txnDate1, dateadd(day, 7, from_unixtime(unix_timestamp() + 19800)))))
+				 when upper(o.paymentoption)  in ( '10% ADVANCE | 90% COD'  ) then ((0.9 * (pold.price / 100)) * datediff(day, ifnull(from_unixtime(tr.actPaymentDate + 19800), if_null(from_unixtime(pc.expectedpaymentdate + 19800), cast(DATE_ADD(date_format(pomr.createdOn, '%Y-%m-%d'), interval (CAST(REPLACE(REPLACE(REPLACE(REPLACE(SUBSTRING_INDEX(popm.PolicyId1, ',', -1), '"', ''), ':', ''), '}', ''), 'value', '') AS SIGNED)) DAY) as date))), ifnull(lmd.txnDate1, dateadd(day, 7, from_unixtime(unix_timestamp() + 19800)))))
+				 when upper(o.paymentoption)  in ( 'FULL COD'  ) then datediff(day, ifnull(from_unixtime(tr.actPaymentDate + 19800), if_null(from_unixtime(pc.expectedpaymentdate + 19800), cast(DATE_ADD(date_format(pomr.createdOn, '%Y-%m-%d'), interval (CAST(REPLACE(REPLACE(REPLACE(REPLACE(SUBSTRING_INDEX(popm.PolicyId1, ',', -1), '"', ''), ':', ''), '}', ''), 'value', '') AS SIGNED)) DAY) as date))), ifnull(lmd.txnDate1, dateadd(day, 7, from_unixtime(unix_timestamp() + 19800)))) * (pold.price / 100)
+				 when upper(o.paymentoption)  in ( 'RS.10000 ADVANCE'  ) then (((1 -rt.ordervalue) * (pold.price / 100)) * datediff(day, ifnull(from_unixtime(tr.actPaymentDate + 19800), if_null(from_unixtime(pc.expectedpaymentdate + 19800), cast(DATE_ADD(date_format(pomr.createdOn, '%Y-%m-%d'), interval (CAST(REPLACE(REPLACE(REPLACE(REPLACE(SUBSTRING_INDEX(popm.PolicyId1, ',', -1), '"', ''), ':', ''), '}', ''), 'value', '') AS SIGNED)) DAY) as date))), ifnull(lmd.txnDate1, dateadd(day, 7, from_unixtime(unix_timestamp() + 19800)))))
+				 when upper(o.paymentoption)  in ( 'RS.40000 ADVANCE'  ) then (((1 -rt.ordervalue1) * (pold.price / 100)) * datediff(day, ifnull(from_unixtime(tr.actPaymentDate + 19800), if_null(from_unixtime(pc.expectedpaymentdate + 19800), cast(DATE_ADD(date_format(pomr.createdOn, '%Y-%m-%d'), interval (CAST(REPLACE(REPLACE(REPLACE(REPLACE(SUBSTRING_INDEX(popm.PolicyId1, ',', -1), '"', ''), ':', ''), '}', ''), 'value', '') AS SIGNED)) DAY) as date))), ifnull(lmd.txnDate1, dateadd(day, 7, from_unixtime(unix_timestamp() + 19800)))))
+			 end as PriceXDays,
+		 from_unixtime(tr.actPaymentDate + 19800) as SellerTransactionDate,
+		 from_unixtime(pc.expectedpaymentdate + 19800) as ExpectedPaymentDate,
+		 cast(DATE_ADD(date_format(pomr.createdOn, '%Y-%m-%d'), interval (CAST(REPLACE(REPLACE(REPLACE(REPLACE(SUBSTRING_INDEX(popm.PolicyId1, ',', -1), '"', ''), ':', ''), '}', ''), 'value', '') AS SIGNED)) DAY) as date) as policyDate
+FROM  lot_master lm
+LEFT JOIN orders o ON lm.skorderid  = o.skorderid 
+LEFT JOIN(	SELECT DISTINCT
+			 skorderid,
+			 max(txnDate1) txnDate1
+	FROM  LP_MIS_Dump_Final 
+	GROUP BY  skorderid 
+) lmd ON o.skorderid  = lmd.skorderid 
+LEFT JOIN purchase_order_lot_details pold ON lm.id  = pold.lotid 
+LEFT JOIN purchase_order_marked_ready pomr ON pomr.id  = pold.markreadyid 
+LEFT JOIN settlement_master sm2 ON lm.id  = sm2.lotid
+	 AND	upper(sm2.settlementCategoryType)  = 'PURCHASED-OUTRIGHT' 
+LEFT JOIN payment_cycle AS  pc ON sm2.paymentCycleID  = pc.paymentCycleID 
+LEFT JOIN transaction_master AS  tr ON tr.transactionID  = pc.financeTransactionId 
+LEFT JOIN(	SELECT
+			 o1.orderid orderid,
+			 sum((od.skPrice -od.couponDiscount + od.sellerdiscount + od.shipping + od.shippingTaxAmt -od.shippingDiscount + od.shippingMarginDiscountApplied -od.advDiscount) * od.setSize * od.SetCount) as OrderValue
+	FROM  orders o1
+INNER JOIN order_details od ON o1.orderid  = od.orderid  
+	GROUP BY  orderid 
+) ov ON o.orderid  = ov.orderid 
+LEFT JOIN(	SELECT
+			 concat(o2.userid, o2.updatedOn) as transactionId,
+			 o2.updatedOn updatedOn,
+			 10000 / sum((od1.skPrice -od1.couponDiscount + od1.sellerdiscount + od1.shipping + od1.shippingTaxAmt -od1.shippingDiscount + od1.shippingMarginDiscountApplied -od1.advDiscount) * od1.setSize * od1.SetCount) ordervalue,
+			 40000 / sum((od1.skPrice -od1.couponDiscount + od1.sellerdiscount + od1.shipping + od1.shippingTaxAmt -od1.shippingDiscount + od1.shippingMarginDiscountApplied -od1.advDiscount) * od1.setSize * od1.SetCount) ordervalue1
+	FROM  orders o2
+INNER JOIN order_details od1 ON o2.orderid  = od1.orderid  
+	GROUP BY transactionId,
+		  updatedOn 
+) rt ON rt.updatedOn  = o.updatedOn 
+LEFT JOIN seller_master sm ON sm.userid  = o.sellerid 
+LEFT JOIN seller_master ag ON lm.sellerid  = ag.userid 
+LEFT JOIN(	SELECT
+			 od3.variantid variantid,
+			 od3.sizeid sizeid,
+			 o3.skorderid skorderid,
+			 (od3.skPrice -od3.couponDiscount + od3.sellerdiscount + od3.shipping + od3.shippingTaxAmt -od3.shippingDiscount + od3.shippingMarginDiscountApplied -od3.advDiscount) * od3.setSize as Value
+	FROM  order_details od3
+INNER JOIN orders o3 ON o3.orderid  = od3.orderid  
+) ost ON lm.variantid  = ost.variantid
+	 AND	lm.sizeid  = ost.sizeid
+	 AND	lm.skorderid  = ost.skorderid 
+LEFT JOIN purchase_order_details pod ON pold.purchaseorderdetailid  = pod.id 
+LEFT JOIN purchase_order_policy_mapping popm ON popm.purchaseOrderDetailId  = pod.id
+	 AND	popm.status  = 'true' 
+LEFT JOIN MatchMaker_Mapping_Base_Table a ON a.PurchaseOrderdetailId  = pod.id 
+LEFT JOIN variants v ON lm.variantid  = v.variantid 
+LEFT JOIN products AS  p ON p.productid  = v.productid 
+LEFT JOIN category_master AS  cm ON cm.categoryid  = p.subcategoryid 
+LEFT JOIN category_master AS  cm1 ON cm1.categoryid  = cm.parentid 
+LEFT JOIN category_master AS  cm2 ON cm2.categoryid  = cm1.parentid 
+LEFT JOIN order_status os ON o.orderid  = os.orderid 
+LEFT JOIN consignment_master cmt ON o.skorderid  = cmt.skconsignmentid  
+WHERE	 date_format(pomr.createdOn, '%Y%m%d')  >= '20231006'
+ AND	upper(o.paymentoption)  != '100% ADVANCE'
+ AND	sm.userID  != 1490486208
+ AND	upper(ag.companyname)  not in ( 'DELHI MARKET'  , 'AGRA MARKET'  , 'JAIPUR MARKET'  , 'LUDHIANA MARKET'  , 'TIRUPUR MARKET'  )
+ AND	(
+	case
+		 when lmd.txnDate1  is null
+		 AND	tr.actPaymentDate  is null then 1
+		 else null
+	 end)  is null
+UNION ALL
+ (SELECT DISTINCT
+		 
+			case
+				 when o.updatedOn  is not null
+				 AND	tr.actPaymentDate  is not null then 'Payment realised and paid to seller'
+				 when o.updatedOn  is not null
+				 AND	tr.actPaymentDate  is null then 'Payment realised and with bijnis'
+				 when o.updatedOn  is null
+				 AND	tr.actPaymentDate  is not null then 'Paid to Seller, not yet realised by bijnis'
+			 end as Disposition,
+		 'Advance' as Payment_Status,
+		 
+			case
+				 when upper(o.paymentoption)  != 'FULL COD' then date_add(from_unixtime(o.updatedOn + 19800), interval (2) day)
+			 end as PaymentReceiveddate,
+		 from_unixtime(tr.actPaymentDate + 19800) as SellerPaymentDate,
+		 date_add(from_unixtime(o.updatedOn + 19800), interval (2) day) as CalculatedRecievedDate,
+		 ifnull(from_unixtime(tr.actPaymentDate + 19800), if_null(from_unixtime(pc.expectedpaymentdate + 19800), cast(DATE_ADD(date_format(pomr.createdOn, '%Y-%m-%d'), interval (CAST(REPLACE(REPLACE(REPLACE(REPLACE(SUBSTRING_INDEX(popm.PolicyId1, ',', -1), '"', ''), ':', ''), '}', ''), 'value', '') AS SIGNED)) DAY) as date))) as calculatedPaymentDate,
+		 lm.skorderid Skorderid,
+		 from_unixtime(o.updatedOn + 19800) OrderPlacedDate,
+		 os.orderstatus orderstatus,
+		 lm.sellerid sellerid,
+		 ag.companyname sellername,
+		 lm.id as Lotid,
+		 upper(cm.name) subcategory,
+		 upper(cm2.name) supercategory,
+		 upper(sm.companyname) Cluster,
+		 upper(case
+				 when a.Matchmaker  = 'Ashish Bothra' then 'Heena Manchanda'
+				 when a.Matchmaker  = 'Md Sameer' then 'Aanam Aquil'
+				 else a.Matchmaker
+			 end) as Matchmaker,
+		 o.paymentoption PaymentOption,
+		 
+			case
+				 when upper(o.paymentoption)  != 'FULL COD' then datediff(day, ifnull(from_unixtime(tr.actPaymentDate + 19800), if_null(from_unixtime(pc.expectedpaymentdate + 19800), cast(DATE_ADD(date_format(pomr.createdOn, '%Y-%m-%d'), interval (CAST(REPLACE(REPLACE(REPLACE(REPLACE(SUBSTRING_INDEX(popm.PolicyId1, ',', -1), '"', ''), ':', ''), '}', ''), 'value', '') AS SIGNED)) DAY) as date))), date_add(from_unixtime(o.updatedOn + 19800), interval ('2') day))
+			 end as workingcapitalindays,
+		 
+			case
+				 when upper(o.paymentoption)  in ( '20% ADVANCE | 80% COD'  ) then 0.2 * (pold.price / 100)
+				 when upper(o.paymentoption)  in ( '10% ADVANCE | 90% COD'  ) then 0.1 * (pold.price / 100)
+				 when upper(o.paymentoption)  in ( '100% ADVANCE'  ) then (pold.price / 100)
+				 when upper(o.paymentoption)  in ( 'RS.10000 ADVANCE'  ) then rt.ordervalue * (pold.price / 100)
+				 when upper(o.paymentoption)  in ( 'RS.40000 ADVANCE'  ) then rt.ordervalue1 * (pold.price / 100)
+			 end as Price,
+		 
+			case
+				 when upper(o.paymentoption)  in ( '20% ADVANCE | 80% COD'  ) then 0.2 * ost.value
+				 when upper(o.paymentoption)  in ( '10% ADVANCE | 90% COD'  ) then 0.1 * ost.value
+				 when upper(o.paymentoption)  in ( '100% ADVANCE'  ) then ost.value
+				 when upper(o.paymentoption)  in ( 'RS.10000 ADVANCE'  ) then (rt.ordervalue) * ost.value
+				 when upper(o.paymentoption)  in ( 'RS.40000 ADVANCE'  ) then (rt.ordervalue1) * ost.value
+			 end as orderValue,
+		 
+			case
+				 when upper(o.paymentoption)  in ( '20% ADVANCE | 80% COD'  ) then ((0.2 * (pold.price / 100)) * (datediff(day, ifnull(from_unixtime(tr.actPaymentDate + 19800), if_null(from_unixtime(pc.expectedpaymentdate + 19800), cast(DATE_ADD(date_format(pomr.createdOn, '%Y-%m-%d'), interval (CAST(REPLACE(REPLACE(REPLACE(REPLACE(SUBSTRING_INDEX(popm.PolicyId1, ',', -1), '"', ''), ':', ''), '}', ''), 'value', '') AS SIGNED)) DAY) as date))), ifnull(from_unixtime(o.updatedOn + 19800), from_unixtime(unix_timestamp() + 19800)))))
+				 when upper(o.paymentoption)  in ( '10% ADVANCE | 90% COD'  ) then ((0.1 * (pold.price / 100)) * (datediff(day, ifnull(from_unixtime(tr.actPaymentDate + 19800), if_null(from_unixtime(pc.expectedpaymentdate + 19800), cast(DATE_ADD(date_format(pomr.createdOn, '%Y-%m-%d'), interval (CAST(REPLACE(REPLACE(REPLACE(REPLACE(SUBSTRING_INDEX(popm.PolicyId1, ',', -1), '"', ''), ':', ''), '}', ''), 'value', '') AS SIGNED)) DAY) as date))), ifnull(from_unixtime(o.updatedOn + 19800), from_unixtime(unix_timestamp() + 19800)))))
+				 when upper(o.paymentoption)  in ( '100% ADVANCE'  ) then datediff(day, ifnull(from_unixtime(tr.actPaymentDate + 19800), if_null(from_unixtime(pc.expectedpaymentdate + 19800), cast(DATE_ADD(date_format(pomr.createdOn, '%Y-%m-%d'), interval (CAST(REPLACE(REPLACE(REPLACE(REPLACE(SUBSTRING_INDEX(popm.PolicyId1, ',', -1), '"', ''), ':', ''), '}', ''), 'value', '') AS SIGNED)) DAY) as date))), ifnull(from_unixtime(o.updatedOn + 19800), from_unixtime(unix_timestamp() + 19800))) * (pold.price / 100)
+				 when upper(o.paymentoption)  in ( 'RS.10000 ADVANCE'  ) then (((rt.ordervalue) * (pold.price / 100)) * (datediff(day, ifnull(from_unixtime(tr.actPaymentDate + 19800), if_null(from_unixtime(pc.expectedpaymentdate + 19800), cast(DATE_ADD(date_format(pomr.createdOn, '%Y-%m-%d'), interval (CAST(REPLACE(REPLACE(REPLACE(REPLACE(SUBSTRING_INDEX(popm.PolicyId1, ',', -1), '"', ''), ':', ''), '}', ''), 'value', '') AS SIGNED)) DAY) as date))), ifnull(from_unixtime(o.updatedOn + 19800), from_unixtime(unix_timestamp() + 19800)))))
+				 when upper(o.paymentoption)  in ( 'RS.40000 ADVANCE'  ) then (((rt.ordervalue1) * (pold.price / 100)) * (datediff(day, ifnull(from_unixtime(tr.actPaymentDate + 19800), if_null(from_unixtime(pc.expectedpaymentdate + 19800), cast(DATE_ADD(date_format(pomr.createdOn, '%Y-%m-%d'), interval (CAST(REPLACE(REPLACE(REPLACE(REPLACE(SUBSTRING_INDEX(popm.PolicyId1, ',', -1), '"', ''), ':', ''), '}', ''), 'value', '') AS SIGNED)) DAY) as date))), ifnull(from_unixtime(o.updatedOn + 19800), from_unixtime(unix_timestamp() + 19800)))))
+			 end as PriceXDays,
+		 from_unixtime(tr.actPaymentDate + 19800) as SellerTransactionDate,
+		 from_unixtime(pc.expectedpaymentdate + 19800) as ExpectedPaymentDate,
+		 cast(DATE_ADD(date_format(pomr.createdOn, '%Y-%m-%d'), interval (CAST(REPLACE(REPLACE(REPLACE(REPLACE(SUBSTRING_INDEX(popm.PolicyId1, ',', -1), '"', ''), ':', ''), '}', ''), 'value', '') AS SIGNED)) DAY) as date) as policyDate
+FROM  lot_master lm
+LEFT JOIN orders o ON lm.skorderid  = o.skorderid 
+LEFT JOIN purchase_order_lot_details pold ON lm.id  = pold.lotid 
+LEFT JOIN purchase_order_marked_ready pomr ON pomr.id  = pold.markreadyid 
+LEFT JOIN settlement_master sm2 ON lm.id  = sm2.lotid
+	 AND	upper(sm2.settlementCategoryType)  = 'PURCHASED-OUTRIGHT' 
+LEFT JOIN payment_cycle AS  pc ON sm2.paymentCycleID  = pc.paymentCycleID 
+LEFT JOIN transaction_master AS  tr ON tr.transactionID  = pc.financeTransactionId 
+LEFT JOIN(	SELECT
+			 o1.orderid orderid,
+			 sum((od.skPrice -od.couponDiscount + od.sellerdiscount + od.shipping + od.shippingTaxAmt -od.shippingDiscount + od.shippingMarginDiscountApplied -od.advDiscount) * od.setSize * od.SetCount) as OrderValue
+	FROM  orders o1
+INNER JOIN order_details od ON o1.orderid  = od.orderid  
+	GROUP BY  orderid 
+) ov ON o.orderid  = ov.orderid 
+LEFT JOIN(	SELECT
+			 concat(o2.userid, o2.updatedOn) as transactionId,
+			 o2.updatedOn updatedOn,
+			 10000 / sum((od1.skPrice -od1.couponDiscount + od1.sellerdiscount + od1.shipping + od1.shippingTaxAmt -od1.shippingDiscount + od1.shippingMarginDiscountApplied -od1.advDiscount) * od1.setSize * od1.SetCount) as ordervalue,
+			 40000 / sum((od1.skPrice -od1.couponDiscount + od1.sellerdiscount + od1.shipping + od1.shippingTaxAmt -od1.shippingDiscount + od1.shippingMarginDiscountApplied -od1.advDiscount) * od1.setSize * od1.SetCount) ordervalue1
+	FROM  orders o2
+INNER JOIN order_details od1 ON o2.orderid  = od1.orderid  
+	GROUP BY transactionId,
+		  updatedOn 
+) rt ON rt.updatedOn  = o.updatedOn 
+LEFT JOIN seller_master sm ON sm.userid  = o.sellerid 
+LEFT JOIN seller_master ag ON lm.sellerid  = ag.userid 
+LEFT JOIN(	SELECT
+			 od3.variantid variantid,
+			 od3.sizeid sizeid,
+			 o3.skorderid skorderid,
+			 (od3.skPrice -od3.couponDiscount + od3.sellerdiscount + od3.shipping + od3.shippingTaxAmt -od3.shippingDiscount + od3.shippingMarginDiscountApplied -od3.advDiscount) * od3.setSize as Value
+	FROM  order_details od3
+INNER JOIN orders o3 ON o3.orderid  = od3.orderid  
+) ost ON lm.variantid  = ost.variantid
+	 AND	lm.sizeid  = ost.sizeid
+	 AND	lm.skorderid  = ost.skorderid 
+LEFT JOIN purchase_order_details pod ON pold.purchaseorderdetailid  = pod.id 
+LEFT JOIN purchase_order_policy_mapping popm ON popm.purchaseOrderDetailId  = pod.id
+	 AND	popm.status  = 'true' 
+LEFT JOIN MatchMaker_Mapping_Base_Table a ON a.PurchaseOrderdetailId  = pod.id 
+LEFT JOIN variants v ON lm.variantid  = v.variantid 
+LEFT JOIN products AS  p ON p.productid  = v.productid 
+LEFT JOIN category_master AS  cm ON cm.categoryid  = p.subcategoryid 
+LEFT JOIN category_master AS  cm1 ON cm1.categoryid  = cm.parentid 
+LEFT JOIN category_master AS  cm2 ON cm2.categoryid  = cm1.parentid 
+LEFT JOIN order_status os ON o.orderid  = os.orderid  
+WHERE	 date_format(pomr.createdOn, '%Y%m%d')  >= '20231006'
+ AND	upper(o.paymentoption)  != 'FULL COD'
+ AND	sm.userID  != 1490486208
+ AND	(
+	case
+		 when o.updatedOn  is null
+		 AND	tr.actPaymentDate  is null then 1
+		 else null
+	 end)  is null
+ AND	upper(ag.companyname)  not in ( 'DELHI MARKET'  , 'AGRA MARKET'  , 'JAIPUR MARKET'  , 'LUDHIANA MARKET'  , 'TIRUPUR MARKET'  )
+)UNION ALL
+ (SELECT DISTINCT
+		 
+			case
+				 when lm.status  in ( 'lost-in-rto-unpacking'  , 'lost-in-warehouse'  ) then 'Lost'
+				 when o.updatedOn  is not null
+				 AND	tr.actPaymentDate  is not null then 'Payment realised and paid to seller'
+				 when o.updatedOn  is not null
+				 AND	tr.actPaymentDate  is null then 'Payment realised and with bijnis'
+				 when o.updatedOn  is null
+				 AND	tr.actPaymentDate  is not null then 'Paid to Seller, not yet realised by bijnis'
+			 end as Disposition,
+		 'In Warehouse' as Payment_Status,
+		 null as PaymentReceiveddate,
+		 from_unixtime(tr.actPaymentDate + 19800) as SellerPaymentDate,
+		 ifnull(from_unixtime(tr.actPaymentDate + 19800), if_null(from_unixtime(pc.expectedpaymentdate + 19800), cast(DATE_ADD(date_format(pomr.createdOn, '%Y-%m-%d'), interval (CAST(REPLACE(REPLACE(REPLACE(REPLACE(SUBSTRING_INDEX(popm.PolicyId1, ',', -1), '"', ''), ':', ''), '}', ''), 'value', '') AS SIGNED)) DAY) as date))) as calculatedPaymentDate,
+		 dateadd(day, 15, from_unixtime(unix_timestamp() + 19800)) as calculatedReceivedDate,
+		 null Skorderid,
+		 null as orderplacedDate,
+		 null as orderstatus,
+		 lm.sellerid sellerid,
+		 ag.companyname sellername,
+		 lm.id as Lotid,
+		 upper(cm.name) subcategory,
+		 upper(cm2.name) supercategory,
+		 upper(sm.companyname) Cluster,
+		 upper(case
+				 when a.Matchmaker  = 'Ashish Bothra' then 'Heena Manchanda'
+				 when a.Matchmaker  = 'Md Sameer' then 'Aanam Aquil'
+				 else a.Matchmaker
+			 end) as Matchmaker,
+		 null PaymentOption,
+		 datediff(day, ifnull(from_unixtime(tr.actPaymentDate + 19800), if_null(from_unixtime(pc.expectedpaymentdate + 19800), cast(DATE_ADD(date_format(pomr.createdOn, '%Y-%m-%d'), interval (CAST(REPLACE(REPLACE(REPLACE(REPLACE(SUBSTRING_INDEX(popm.PolicyId1, ',', -1), '"', ''), ':', ''), '}', ''), 'value', '') AS SIGNED)) DAY) as date))), dateadd(day, 15, from_unixtime(unix_timestamp() + 19800))) as workingcapitalindays,
+		 (pold.price / 100) as Price,
+		 null as OrderValue,
+		 datediff(day, ifnull(from_unixtime(tr.actPaymentDate + 19800), if_null(from_unixtime(pc.expectedpaymentdate + 19800), cast(DATE_ADD(date_format(pomr.createdOn, '%Y-%m-%d'), interval (CAST(REPLACE(REPLACE(REPLACE(REPLACE(SUBSTRING_INDEX(popm.PolicyId1, ',', -1), '"', ''), ':', ''), '}', ''), 'value', '') AS SIGNED)) DAY) as date))), dateadd(day, 15, from_unixtime(unix_timestamp() + 19800))) * (pold.price / 100) as PriceXDays,
+		 from_unixtime(tr.actPaymentDate + 19800) as SellerTransactionDate,
+		 from_unixtime(pc.expectedpaymentdate + 19800) as ExpectedPaymentDate,
+		 cast(DATE_ADD(date_format(pomr.createdOn, '%Y-%m-%d'), interval (CAST(REPLACE(REPLACE(REPLACE(REPLACE(SUBSTRING_INDEX(popm.PolicyId1, ',', -1), '"', ''), ':', ''), '}', ''), 'value', '') AS SIGNED)) DAY) as date) as policyDate
+FROM  lot_master lm
+LEFT JOIN orders o ON lm.skorderid  = o.skorderid 
+LEFT JOIN(	SELECT DISTINCT
+			 skorderid,
+			 max(txnDate1) txnDate1
+	FROM  LP_MIS_Dump_Final 
+	GROUP BY  skorderid 
+) lmd ON o.skorderid  = lmd.skorderid 
+LEFT JOIN purchase_order_lot_details pold ON lm.id  = pold.lotid 
+LEFT JOIN purchase_order_marked_ready pomr ON pomr.id  = pold.markreadyid 
+LEFT JOIN settlement_master sm2 ON lm.id  = sm2.lotid
+	 AND	upper(sm2.settlementCategoryType)  = 'PURCHASED-OUTRIGHT' 
+LEFT JOIN payment_cycle AS  pc ON sm2.paymentCycleID  = pc.paymentCycleID 
+LEFT JOIN transaction_master AS  tr ON tr.transactionID  = pc.financeTransactionId 
+LEFT JOIN(	SELECT
+			 o1.orderid orderid,
+			 sum((od.skPrice -od.couponDiscount + od.sellerdiscount + od.shipping + od.shippingTaxAmt -od.shippingDiscount + od.shippingMarginDiscountApplied -od.advDiscount) * od.setSize * od.SetCount) as OrderValue
+	FROM  orders o1
+INNER JOIN order_details od ON o1.orderid  = od.orderid  
+	GROUP BY  orderid 
+) ov ON o.orderid  = ov.orderid 
+LEFT JOIN(	SELECT
+			 concat(o2.userid, o2.updatedOn) as transactionId,
+			 o2.updatedOn updatedOn,
+			 10000 / sum((od1.skPrice -od1.couponDiscount + od1.sellerdiscount + od1.shipping + od1.shippingTaxAmt -od1.shippingDiscount + od1.shippingMarginDiscountApplied -od1.advDiscount) * od1.setSize * od1.SetCount) ordervalue,
+			 40000 / sum((od1.skPrice -od1.couponDiscount + od1.sellerdiscount + od1.shipping + od1.shippingTaxAmt -od1.shippingDiscount + od1.shippingMarginDiscountApplied -od1.advDiscount) * od1.setSize * od1.SetCount) ordervalue1
+	FROM  orders o2
+INNER JOIN order_details od1 ON o2.orderid  = od1.orderid  
+	GROUP BY transactionId,
+		  updatedOn 
+) rt ON rt.updatedOn  = o.updatedOn 
+LEFT JOIN seller_master sm ON sm.userid  = o.sellerid 
+LEFT JOIN seller_master ag ON lm.sellerid  = ag.userid 
+LEFT JOIN(	SELECT
+			 od3.variantid variantid,
+			 od3.sizeid sizeid,
+			 o3.skorderid skorderid,
+			 (od3.skPrice -od3.couponDiscount + od3.sellerdiscount + od3.shipping + od3.shippingTaxAmt -od3.shippingDiscount + od3.shippingMarginDiscountApplied -od3.advDiscount) * od3.setSize as Value
+	FROM  order_details od3
+INNER JOIN orders o3 ON o3.orderid  = od3.orderid  
+) ost ON lm.variantid  = ost.variantid
+	 AND	lm.sizeid  = ost.sizeid
+	 AND	lm.skorderid  = ost.skorderid 
+LEFT JOIN purchase_order_details pod ON pold.purchaseorderdetailid  = pod.id 
+LEFT JOIN purchase_order_policy_mapping popm ON popm.purchaseOrderDetailId  = pod.id
+	 AND	popm.status  = 'true' 
+LEFT JOIN MatchMaker_Mapping_Base_Table a ON a.PurchaseOrderdetailId  = pod.id 
+LEFT JOIN variants v ON lm.variantid  = v.variantid 
+LEFT JOIN products AS  p ON p.productid  = v.productid 
+LEFT JOIN category_master AS  cm ON cm.categoryid  = p.subcategoryid 
+LEFT JOIN category_master AS  cm1 ON cm1.categoryid  = cm.parentid 
+LEFT JOIN category_master AS  cm2 ON cm2.categoryid  = cm1.parentid 
+LEFT JOIN order_status os ON o.orderid  = os.orderid  
+WHERE	 date_format(pomr.createdOn, '%Y%m%d')  >= '20231006'
+ AND	sm.userID  != 1490486208
+ AND	lm.status  in ( 'in-shelf'  , 'in-scan'  , 'in-shelf-bad'  , 'lost-in-rto-unpacking'  , 'order-cancelled'  , 'outscan-seller'  , 'picked'  , 'removed-for-return'  , 'rto-in-shelf-bad'  , 'rto-in-shelf-good'  , 'lost-in-warehouse'  )
+ AND	tr.actPaymentDate  is not null
+ AND	upper(ag.companyname)  not in ( 'DELHI MARKET'  , 'AGRA MARKET'  , 'JAIPUR MARKET'  , 'LUDHIANA MARKET'  , 'TIRUPUR MARKET'  )
+) 
