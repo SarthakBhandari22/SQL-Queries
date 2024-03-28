@@ -1,0 +1,352 @@
+SELECT
+		 
+			case
+				 when fm.gmv  = 0 then 
+					case
+						 when fm."Impressions (Buyer X Variant X Date)"  > fdsl.ImpressionsperOrder then 'Ineffective and gmv = 0'
+						 when fm."Clicks (Buyer X Variant X Date)"  > fdsl.ClicksPerOrder then 'Ineffective and gmv = 0' /* when fm."CTR Per Variant (Buyer X Variant X Date)"  > fdsl.ClicksPerImpression then 'Ineffective and gmv = 0'*/
+						 else 'Under Observation and gmv = 0'
+					 end
+				 when fm.gmv  > 0 then 
+					case
+						 when oc.ordercount  > 3
+						 AND	((((ret.GRPairs) / (ret.Deliveredpairs)) * 100)  > (vg2.GR_avg)) then 'Ineffective and gmv > 0'
+						 when oc.ordercount  > 3
+						 AND	vc."Cancel_perc"  > (vc2.Cancel_avg) then 'Ineffective and gmv > 0'
+						 when oc.ordercount  <= 5
+						 AND	oc.ordercount  > 3
+						 AND	(((ret.NGRPairs) / (ret.Deliveredpairs)) * 100)  > 66 then 'Ineffective and gmv > 0'
+						 when oc.ordercount  <= 10
+						 AND	oc.ordercount  > 5
+						 AND	(((ret.NGRPairs) / (ret.Deliveredpairs)) * 100)  > 40 then 'Ineffective and gmv > 0'
+						 when oc.ordercount  <= 20
+						 AND	oc.ordercount  > 10
+						 AND	(((ret.NGRPairs) / (ret.Deliveredpairs)) * 100)  > 30 then 'Ineffective and gmv > 0'
+						 when oc.ordercount  > 20
+						 AND	(((ret.NGRPairs) / (ret.Deliveredpairs)) * 100)  > ec."NGR %" then 'Ineffective and gmv > 0'
+						 when oc.ordercount  > 3
+						 AND	vfm.vfm  < ec.VFM then 'Ineffective and gmv > 0'
+						 when oc.ordercount  <= 3
+						 AND	oc.ordercount  > 0 then 'Under Observation and gmv > 0'
+						 else 'Effective'
+					 end
+			 end as EffectivityCategory,
+		 
+			case
+				 when datediff(day, aav1.FirstLiveDate, from_unixtime(unix_timestamp() + 19800))  <= 90 then 'A <= 90 days Aging'
+				 when datediff(day, aav1.FirstLiveDate, from_unixtime(unix_timestamp() + 19800))  > 90
+				 AND	datediff(day, aav1.FirstLiveDate, from_unixtime(unix_timestamp() + 19800))  <= 180 then 'B 90 - 180 Aging'
+				 when datediff(day, aav1.FirstLiveDate, from_unixtime(unix_timestamp() + 19800))  > 180
+				 AND	datediff(day, aav1.FirstLiveDate, from_unixtime(unix_timestamp() + 19800))  <= 360 then 'C 180 - 360 Aging'
+				 when datediff(day, aav1.FirstLiveDate, from_unixtime(unix_timestamp() + 19800))  > 360 then 'D > 360 Aging'
+			 end as PeriodBucket,
+		 m.Active_Days as ActiveDaysInLast12Months,
+		 upper(cmt.name) subcategory,
+		 fm.variantid variantid,
+		 v1.defimage variantImage,
+		 p.productname productname,
+		 
+			case
+				 when fm.variantid  = sv.variantid then 'PP'
+				 else 'DP'
+			 end as Platform,
+		 sm.companyname sellername,
+		 
+			case
+				 when sm.FactoryType  is null then 'non-consumer'
+				 else sm.FactoryType
+			 end as FactoryType,
+		 datediff(day, aav1.FirstLiveDate, from_unixtime(unix_timestamp() + 19800)) as Aging,
+		 
+			case
+				 when datediff(day, aav1.FirstLiveDate, from_unixtime(unix_timestamp() + 19800))  <= 15 then 'New (<=15 Days)'
+				 else 'Old (>15 Days)'
+			 end as VariantAgingStatus,
+		 
+			case
+				 when fm.gmv  = 0 then 'Without GMV'
+				 when fm.gmv  > 0 then 'With GMV'
+			 end as Gmv_Status,
+		 
+			case
+				 when fm.gmv  = 0 then 
+					case
+						 when fm."Impressions (Buyer X Variant X Date)"  > fdsl.ImpressionsperOrder then 'Ineffective'
+						 when fm."Clicks (Buyer X Variant X Date)"  > fdsl.ClicksPerOrder then 'Ineffective'
+						 when fm."CTR Per Variant (Buyer X Variant X Date)"  > fdsl.ClicksPerImpression then 'Ineffective'
+						 else 'Under Observation'
+					 end
+				 when fm.gmv  > 0 then 
+					case
+						 when oc.ordercount  > 3
+						 AND	((((ret.GRPairs) / (ret.Deliveredpairs)) * 100)  > (vg2.GR_avg)) then 'Ineffective'
+						 when oc.ordercount  > 3
+						 AND	vc."Cancel_perc"  > (vc2.Cancel_avg) then 'Ineffective'
+						 when oc.ordercount  <= 5
+						 AND	oc.ordercount  > 3
+						 AND	(((ret.NGRPairs) / (ret.Deliveredpairs)) * 100)  > 66 then 'Ineffective'
+						 when oc.ordercount  <= 10
+						 AND	oc.ordercount  > 5
+						 AND	(((ret.NGRPairs) / (ret.Deliveredpairs)) * 100)  > 40 then 'Ineffective'
+						 when oc.ordercount  <= 20
+						 AND	oc.ordercount  > 10
+						 AND	(((ret.NGRPairs) / (ret.Deliveredpairs)) * 100)  > 30 then 'Ineffective'
+						 when oc.ordercount  > 20
+						 AND	(((ret.NGRPairs) / (ret.Deliveredpairs)) * 100)  > ec."NGR %" then 'Ineffective'
+						 when oc.ordercount  > 3
+						 AND	vfm.vfm  < ec.VFM then 'Ineffective'
+						 when oc.ordercount  <= 3
+						 AND	oc.ordercount  > 0 then 'Under Observation'
+						 else 'Effective'
+					 end
+			 end as EffectivityStatus,
+		 fm."Impressions (Buyer X Variant X Date)" as Impressions,
+		 fm."Clicks (Buyer X Variant X Date)" as Clicks,
+		 fm."Pairs" Pairs,
+		 fm."CTR Per Variant (Buyer X Variant X Date)" as CTR,
+		 fm.Conversion Conversion,
+		 fm.GMV GMV,
+		 (((ret.GRPairs) / (ret.Deliveredpairs)) * 100) as "GR %",
+		 (((ret.NGRPairs) / (ret.Deliveredpairs)) * 100) as "NGR %",
+		 vc.Cancel_perc "Cancel %",
+		 vfm.vfm vfm,
+		 
+			case
+				 when oc.ordercount  IS NULL then '0'
+				 when oc.ordercount  <= 3
+				 AND	oc.ordercount  > 0 then '0 to 3'
+				 when oc.ordercount  <= 5
+				 AND	oc.ordercount  > 3 then '4 to 5'
+				 when oc.ordercount  <= 10
+				 AND	oc.ordercount  > 5 then '6 to 10'
+				 when oc.ordercount  <= 20
+				 AND	oc.ordercount  > 10 then '11 to 20'
+				 else '20+'
+			 end as OrderCountBucket,
+		 fdsl.ImpressionsperOrder ImpressionsperOrder,
+		 fdsl.ClicksPerOrder ClicksPerOrder,
+		 fdsl.ClicksPerImpression ClicksPerImpression,
+		 (vg2.GR_avg) GR_avg,
+		 (vc2.Cancel_avg) Cancel_avg,
+		 ec."NGR %" NGR_cutoff,
+		 ec.VFM VFM_cutoff,
+		 
+			case
+				 when (((ret.GRPairs) / (ret.Deliveredpairs)) * 100)  > (vg2.GR_avg) then 'GR'
+				 else NULL
+			 end as GR_BenchmarkBreach,
+		 
+			case
+				 when vc."Cancel_perc"  > (vc2.Cancel_avg) then 'Cancellations'
+				 else NULL
+			 end as cancel_BenchmarkBreach,
+		 
+			case
+				 when oc.ordercount  <= 5
+				 AND	oc.ordercount  > 3
+				 AND	(((ret.NGRPairs) / (ret.Deliveredpairs)) * 100)  > 66 then 'NGR'
+				 when oc.ordercount  <= 10
+				 AND	oc.ordercount  > 5
+				 AND	(((ret.NGRPairs) / (ret.Deliveredpairs)) * 100)  > 40 then 'NGR'
+				 when oc.ordercount  <= 20
+				 AND	oc.ordercount  > 10
+				 AND	(((ret.NGRPairs) / (ret.Deliveredpairs)) * 100)  > 30 then 'NGR'
+				 when oc.ordercount  > 20
+				 AND	(((ret.NGRPairs) / (ret.Deliveredpairs)) * 100)  > ec."NGR %" then 'NGR'
+				 else NULL
+			 end as 'NGR_BenchmarkBreach',
+		 
+			case
+				 when vfm.vfm  < ec.VFM then 'VFM'
+				 else NULL
+			 end as 'VFM_BenchmarkBreach',
+		 
+			case
+				 when fm."Impressions (Buyer X Variant X Date)"  > fdsl.ImpressionsperOrder then 'Impressions'
+				 else NULL
+			 end as Impression_BenchmarkBreach,
+		 
+			case
+				 when fm."Clicks (Buyer X Variant X Date)"  > fdsl.ClicksPerOrder then 'Clicks'
+				 else NULL
+			 end as Clicks_BenchmarkBreach,
+		 
+			case
+				 when fm."CTR Per Variant (Buyer X Variant X Date)"  > fdsl.ClicksPerImpression then 'CTR'
+				 else NULL
+			 end as CTR_BenchmarkBreach,
+		 fd1.ImpressionsperOrder ImpressionsperOrderIn100Days,
+		 fd1.ClicksPerOrder ClicksPerOrderIn100Days,
+		 fd1.ClicksPerImpression ClicksPerImpressionIn100Days,
+		 
+			case
+				 when fm."Impressions (Buyer X Variant X Date)"  > fd1.ImpressionsperOrder then 1
+				 else 0
+			 end as Impression_Breach100days,
+		 
+			case
+				 when fm."Clicks (Buyer X Variant X Date)"  > fd1.ClicksPerOrder then 1
+				 else 0
+			 end as Clicks_Breach100days,
+		 
+			case
+				 when fm."CTR Per Variant (Buyer X Variant X Date)"  > fd1.ClicksPerImpression then 1
+				 else 0
+			 end as CTR_Breach100days,
+		 replace(concat((
+			case
+				 when (((ret.GRPairs) / (ret.Deliveredpairs)) * 100)  > (vg2.GR_avg) then 'GR'
+				 else 'NA'
+			 end), (
+			case
+				 when vc."Cancel_perc"  > (vc2.Cancel_avg) then 'Cancellations'
+				 else 'NA'
+			 end), (
+			case
+				 when oc.ordercount  <= 5
+				 AND	oc.ordercount  > 3
+				 AND	(((ret.NGRPairs) / (ret.Deliveredpairs)) * 100)  > 66 then 'NGR'
+				 when oc.ordercount  <= 10
+				 AND	oc.ordercount  > 5
+				 AND	(((ret.NGRPairs) / (ret.Deliveredpairs)) * 100)  > 40 then 'NGR'
+				 when oc.ordercount  <= 20
+				 AND	oc.ordercount  > 10
+				 AND	(((ret.NGRPairs) / (ret.Deliveredpairs)) * 100)  > 30 then 'NGR'
+				 when oc.ordercount  > 20
+				 AND	(((ret.NGRPairs) / (ret.Deliveredpairs)) * 100)  > ec."NGR %" then 'NGR'
+				 else 'NA'
+			 end), (
+			case
+				 when vfm.vfm  < ec.VFM then 'VFM'
+				 else 'NA'
+			 end), (
+			case
+				 when fm."Impressions (Buyer X Variant X Date)"  > fdsl.ImpressionsperOrder then 'Impressions'
+				 else 'NA'
+			 end), (
+			case
+				 when fm."Clicks (Buyer X Variant X Date)"  > fdsl.ClicksPerOrder then 'Clicks'
+				 else 'NA'
+			 end), (
+			case
+				 when fm."CTR Per Variant (Buyer X Variant X Date)"  > fdsl.ClicksPerImpression then 'CTR'
+				 else 'NA'
+			 end)), 'NA', '') as BreachCriteria,
+		 (fm."Impressions (Buyer X Variant X Date)" -fnv.Min_Impressions) / (fnv.Max_Impressions -fnv.Min_Impressions) as Impression_Normalised,
+		 (fm."Clicks (Buyer X Variant X Date)" -fnv.Min_Clicks) / (fnv.Max_Clicks -fnv.Min_Clicks) as Clicks_Normalised,
+		 (-1) * ((m.Active_Days -sad.min_ActiveDays) / (sad.max_ActiveDays -sad.min_ActiveDays)) as Active_Normalised1,
+		 ((fm."Impressions (Buyer X Variant X Date)" -fnv.Min_Impressions) / (fnv.Max_Impressions -fnv.Min_Impressions)) + ((fm."Clicks (Buyer X Variant X Date)" -fnv.Min_Clicks) / (fnv.Max_Clicks -fnv.Min_Clicks)) + ((-1) * ((m.Active_Days -sad.min_ActiveDays) / (sad.max_ActiveDays -sad.min_ActiveDays))) as norm_sum,
+		 dense_rank() over(PARTITION BY upper(cmt.name)  ORDER BY ((fm."Impressions (Buyer X Variant X Date)" -fnv.Min_Impressions) / (fnv.Max_Impressions -fnv.Min_Impressions)) + ((fm."Clicks (Buyer X Variant X Date)" -fnv.Min_Clicks) / (fnv.Max_Clicks -fnv.Min_Clicks)) + ((-1) * ((m.Active_Days -sad.min_ActiveDays) / (sad.max_ActiveDays -sad.min_ActiveDays))) DESC ) as rank,
+		 from_unixtime(fm.importDate) as ImportDate
+FROM  Last60DaysFunnelMasterData fm
+INNER JOIN(	SELECT
+			 id,
+			 variantid,
+			 startDate,
+			 endDate,
+			 dense_rank() over(PARTITION BY variantid  ORDER BY id DESC ) as rn
+	FROM  application_active_variant_log 
+) aav ON aav.variantid  = fm.variantID
+	 AND	aav.rn  = 1
+	 AND	aav.enddate  is null 
+LEFT JOIN(	SELECT DISTINCT
+			 fm1.VariantId as VariantId,
+			 sum(od.setsize * od.remainingsetcount) as Deliveredpairs,
+			 sum(Case
+					 When cr.approvedon  > 0
+					 AND	cr.isgenuine  = 1 then od.returnPairs
+					 else 0
+				 end) as GRPairs,
+			 sum(Case
+					 When cr.approvedon  > 0
+					 AND	cr.isgenuine  = 2 then od.returnPairs
+					 else 0
+				 end) as NGRPairs
+	FROM  orders AS  o
+INNER JOIN order_details AS  od ON od.orderid  = o.orderid 
+INNER JOIN variants AS  v ON v.variantId  = od.variantId 
+INNER JOIN consignment_master AS  cm ON cm.orderid  = o.orderid 
+LEFT JOIN consignment_return AS  cr ON cr.consignmentId  = cm.consignmentId 
+INNER JOIN Last60DaysFunnelMasterData fm1 ON v.variantid  = fm1.variantid 
+INNER JOIN user_master AS  um ON um.userid  = o.userid 
+INNER JOIN transaction_report tr ON o.orderid  = tr.orderid  
+	WHERE	 (um.origverifydate  > 0
+	 OR	um.isgstverified  > 0
+	 OR	um.orderverifydone  > 0)
+	 AND	(cm.rtodate  = 0
+	 OR	cm.rtodate  is NULL)
+	 AND	date_format(date_add(from_unixtime(cm.actdeliverydate), interval (7) day), '%Y%m%d')  >= date_format(date_add(from_unixtime(fm1.ImportDate + 19800), interval (-60) day), '%Y%m%d')
+	GROUP BY  Variantid 
+) ret ON ret.variantid  = fm.variantid 
+LEFT JOIN(	SELECT
+			 avg(od1.ratingcount) VFM,
+			 od1.variantid variantid
+	FROM  order_details od1
+INNER JOIN Last60DaysFunnelMasterData fm2 ON od1.variantid  = fm2.variantid 
+LEFT JOIN consignment_master cm8 ON cm8.orderid  = od1.orderid 
+INNER JOIN transaction_report tr2 ON od1.orderid  = tr2.orderid  
+	WHERE	 (from_unixtime(cm8.actdeliverydate + 19800)  >= date_add(from_unixtime(fm2.ImportDate + 19800), interval (-60) day))
+	 AND	od1.ratingcount  != 0
+	GROUP BY  variantid 
+) vfm ON vfm.variantid  = fm.variantid 
+LEFT JOIN(	SELECT
+			 od2.variantid variantid,
+			 ((sum(case
+					 when cl1.cancelledby  = 1 then cl1.pairs
+				 end) / (sum(od2.setcount * od2.setsize))) * 100) as Cancel_perc
+	FROM  order_details od2
+LEFT JOIN cancellation_log cl1 ON od2.uniqueid  = cl1.orderdetailid 
+INNER JOIN Last60DaysFunnelMasterData fm3 ON od2.variantid  = fm3.variantid 
+INNER JOIN transaction_report tr3 ON od2.orderid  = tr3.orderid  
+	WHERE	 from_unixtime(od2.createdOn + 19800)  >= date_add(from_unixtime(fm3.ImportDate + 19800), interval (-60) day)
+	GROUP BY  variantid 
+) vc ON vc.variantid  = fm.variantid 
+INNER JOIN variants v1 ON fm.variantid  = v1.variantid 
+LEFT JOIN products p ON v1.productid  = p.productid 
+LEFT JOIN category_master AS  cmt ON cmt.categoryId  = p.subcategoryid 
+LEFT JOIN(	SELECT
+			 upper(vg1.subcategory) subcategory,
+			 avg(vg1."GR %") as GR_avg
+	FROM  Last60daysGRdataForVariantEffectiveness vg1 
+	WHERE	 vg1."GR %"  != 0
+	GROUP BY  subcategory 
+) vg2 ON upper(cmt.name)  = upper(vg2.subcategory) 
+LEFT JOIN(	SELECT
+			 upper(vc1.subcategory) subcategory,
+			 avg(vc1.Cancel_perc) as Cancel_avg
+	FROM  Last60DaysCancellationForVariantEffectiveness vc1 
+	WHERE	 vc1.Cancel_perc  != 0
+	GROUP BY  subcategory 
+) vc2 ON upper(vc2.subcategory)  = upper(cmt.name) 
+LEFT JOIN Effectiveness_Cutoff ec ON upper(ec.subcategory)  = upper(cmt.name) 
+LEFT JOIN(	SELECT DISTINCT variantid
+	FROM  seller_variants 
+) sv ON fm.variantid  = sv.variantid 
+LEFT JOIN(	SELECT
+			 count(DISTINCT o1.orderid) ordercount,
+			 o1.variantid variantid
+	FROM  order_details o1
+INNER JOIN Last60DaysFunnelMasterData fm4 ON o1.variantid  = fm4.variantid 
+INNER JOIN transaction_report tr5 ON o1.orderid  = tr5.orderid  
+	WHERE	 (from_unixtime(o1.createdOn + 19800)  >= date_add(from_unixtime(fm4.ImportDate + 19800), interval (-60) day))
+	GROUP BY  variantid 
+) oc ON oc.variantid  = fm.variantid 
+LEFT JOIN FunnelDataOnSubcatLevelForVariantEffectiveness fdsl ON fdsl.Subcategory  = upper(cmt.name) 
+LEFT JOIN seller_master sm ON p.sellerid  = sm.userid 
+LEFT JOIN FunnelDataSubcatLevel_100daysNew fd1 ON fd1.Subcategory  = upper(cmt.name) 
+LEFT JOIN Last100DaysFunnelData_New f1 ON fm.variantid  = f1.variantid 
+LEFT JOIN(	SELECT
+			 avb.VariantId as VariantId,
+			 count(DISTINCT (avb.Active_Date)) as Active_Days
+	FROM  Active_Variants_Base_Table_Last_12_Months AS  avb 
+	GROUP BY  VariantId 
+) AS  m ON m.VariantId  = fm.variantId 
+LEFT JOIN(	SELECT
+			 variantid,
+			 min(startDate) FirstLiveDate
+	FROM  application_active_variant_log 
+	WHERE	 startDate  is not null
+	GROUP BY  variantid 
+) aav1 ON aav1.variantid  = fm.variantID 
+LEFT JOIN FunnelNormalisedValues fnv ON upper(fnv.subcategory)  = upper(cmt.name) 
+LEFT JOIN SubcategoryActiveDays sad ON upper(sad.subcategory)  = upper(cmt.name)  
